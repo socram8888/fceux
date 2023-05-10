@@ -62,6 +62,7 @@ static void Close() {
 
 void Mapper248_Init(CartInfo *info) {
 	info->Power = Power;
+	info->Close = Close;
 	GameStateRestore = StateRestore;
 
 	AddExState(&prg_reg, sizeof(prg_reg), 0, "PREG");
