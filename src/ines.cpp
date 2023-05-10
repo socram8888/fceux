@@ -763,7 +763,7 @@ BMAPPINGLocal bmap[] = {
 	{"",					245, Mapper245_Init},
 	{"FONG SHEN BANG",		246, Mapper246_Init},
 //	{"",					247, Mapper247_Init},
-//	{"",					248, Mapper248_Init},
+	{"",					248, Mapper248_Init},   // Temporary asignment for development
 	{"",					249, Mapper249_Init},
 	{"",					250, Mapper250_Init},
 //	{"",					251, Mapper251_Init},	// No good dumps for this mapper, use UNIF version
