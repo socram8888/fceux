@@ -21,23 +21,37 @@
 #include "mapinc.h"
 
 static uint8 prg_reg, mir_reg;
-static uint8_t *WRAM, *CHRRAM;
+static uint8_t *WRAM;
 
 static void Sync(void) {
 	setprg16(0x8000, prg_reg);
 	setprg16(0xC000, ~0);
-	setmirror(MI_0 + mir_reg);
+	setchr8(0);
+	switch (mir_reg) {
+	case 0:
+		setmirror(MI_H);
+		break;
+	case 1:
+		setmirror(MI_0);
+		break;
+	case 2:
+		setmirror(MI_1);
+		break;
+	case 3:
+		setmirror(MI_V);
+		break;
+	}
 }
 
 static DECLFW(MirRegWrite) {
-	// 1 bit register for one screen mode
-	mir_reg = V & 1;
+	// 2 bit register for mirroring control, fed LSB first
+	mir_reg = ((V & 1) << 1) | (mir_reg >> 1);
 	Sync();
 }
 
 static DECLFW(PrgRegWrite) {
 	// 5 bit shift register, fed LSB first
-	prg_reg = ((V & 1) << 4) | (prg_reg & 0xF);
+	prg_reg = ((V & 1) << 4) | (prg_reg >> 1);
 	Sync();
 }
 
@@ -56,8 +70,7 @@ static void StateRestore(int version) {
 
 static void Close() {
 	FCEU_free(WRAM);
-	FCEU_free(CHRRAM);
-	CHRRAM = WRAM = NULL;
+	WRAM = NULL;
 }
 
 void Mapper248_Init(CartInfo *info) {
@@ -71,22 +84,4 @@ void Mapper248_Init(CartInfo *info) {
 	WRAM = (uint8*)FCEU_gmalloc(8192);
 	SetupCartPRGMapping(0x10, WRAM, 8192, 1);
 	AddExState(WRAM, 8192, 0, "WRAM");
-
-	CHRRAM = (uint8*)FCEU_gmalloc(8192);
-	SetupCartCHRMapping(0, CHRRAM, 8192, 1);
-	AddExState(CHRRAM, 8192, 0, "CHRR");
-
-	switch (info->mirrorAs2Bits)
-	{
-	case 0: // fixed to horizontal
-		SetupCartMirroring(MI_H, 1, NULL);
-		break;
-	case 1: // fixed to vertical
-		SetupCartMirroring(MI_V, 1, NULL);
-		break;
-	case 2: // mapper-controller one screen
-	case 3:
-		SetupCartMirroring(MI_0, 0, NULL);
-		break;
-	}
 }
