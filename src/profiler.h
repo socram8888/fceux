@@ -32,6 +32,7 @@
  */
 #ifdef __FCEU_PROFILER_ENABLE__
 
+#include <stdio.h>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -44,187 +45,10 @@
 #endif
 
 #include "utils/mutex.h"
+#include "utils/timeStamp.h"
 
 namespace FCEU
 {
-	struct timeStampRecord
-	{
-#if defined(__linux__) || defined(__APPLE__) || defined(__unix__)
-		struct timespec ts;
-		uint64_t tsc;
-
-		timeStampRecord(void)
-		{
-			ts.tv_sec = 0;
-			ts.tv_nsec = 0;
-			tsc = 0;
-		}
-
-		timeStampRecord& operator = (const timeStampRecord& in)
-		{
-			ts = in.ts;
-			tsc = in.tsc;
-			return *this;
-		}
-
-		timeStampRecord& operator += (const timeStampRecord& op)
-		{
-			ts.tv_sec  += op.ts.tv_sec;
-			ts.tv_nsec += op.ts.tv_nsec;
-
-			if (ts.tv_nsec >= 1000000000)
-			{
-				ts.tv_nsec -= 1000000000;
-				ts.tv_sec++;	
-			}
-			tsc += op.tsc;
-			return *this;
-		}
-
-		timeStampRecord operator + (const timeStampRecord& op)
-		{
-			timeStampRecord res;
-
-			res.ts.tv_sec  = ts.tv_sec  + op.ts.tv_sec;
-			res.ts.tv_nsec = ts.tv_nsec + op.ts.tv_nsec;
-
-			if (res.ts.tv_nsec >= 1000000000)
-			{
-				res.ts.tv_nsec -= 1000000000;
-				res.ts.tv_sec++;	
-			}
-			res.tsc = tsc + op.tsc;
-			return res;
-		}
-
-		timeStampRecord operator - (const timeStampRecord& op)
-		{
-			timeStampRecord res;
-
-			res.ts.tv_sec  = ts.tv_sec  - op.ts.tv_sec;
-			res.ts.tv_nsec = ts.tv_nsec - op.ts.tv_nsec;
-
-			if (res.ts.tv_nsec < 0)
-			{
-				res.ts.tv_nsec += 1000000000;
-				res.ts.tv_sec--;	
-			}
-			res.tsc = tsc - op.tsc;
-
-			return res;
-		}
-
-		bool operator > (const timeStampRecord& op)
-		{
-			bool res = false;
-			if (ts.tv_sec == op.ts.tv_sec)
-			{
-				res = (ts.tv_nsec > op.ts.tv_nsec);
-			}
-			else if (ts.tv_sec > op.ts.tv_sec)
-			{
-				res = (ts.tv_sec > op.ts.tv_sec);
-			}
-			return res;
-		}
-
-		bool operator < (const timeStampRecord& op)
-		{
-			bool res = false;
-			if (ts.tv_sec == op.ts.tv_sec)
-			{
-				res = (ts.tv_nsec < op.ts.tv_nsec);
-			}
-			else if (ts.tv_sec > op.ts.tv_sec)
-			{
-				res = (ts.tv_sec < op.ts.tv_sec);
-			}
-			return res;
-		}
-
-		void zero(void)
-		{
-			ts.tv_sec = 0;
-			ts.tv_nsec = 0;
-			tsc = 0;
-		}
-
-		double toSeconds(void)
-		{
-			double sec = static_cast<double>(ts.tv_sec) + ( static_cast<double>(ts.tv_nsec) * 1.0e-9 );
-			return sec;
-		}
-#else	// WIN32
-		uint64_t ts;
-		uint64_t tsc;
-
-		timeStampRecord(void)
-		{
-			ts = 0;
-			tsc = 0;
-		}
-
-		timeStampRecord& operator = (const timeStampRecord& in)
-		{
-			ts = in.ts;
-			tsc = in.tsc;
-			return *this;
-		}
-
-		timeStampRecord& operator += (const timeStampRecord& op)
-		{
-			ts  += op.ts;
-			tsc += op.tsc;
-			return *this;
-		}
-
-		timeStampRecord operator + (const timeStampRecord& op)
-		{
-			timeStampRecord res;
-
-			res.ts  = ts  + op.ts;
-			res.tsc = tsc + op.tsc;
-			return res;
-		}
-
-		timeStampRecord operator - (const timeStampRecord& op)
-		{
-			timeStampRecord res;
-
-			res.ts  = ts  - op.ts;
-			res.tsc = tsc - op.tsc;
-
-			return res;
-		}
-
-		bool operator > (const timeStampRecord& op)
-		{
-			return ts > op.ts;
-		}
-
-		bool operator < (const timeStampRecord& op)
-		{
-			return ts < op.ts;
-		}
-
-		void zero(void)
-		{
-			ts = 0;
-			tsc = 0;
-		}
-
-		double toSeconds(void)
-		{
-			double sec = static_cast<double>(ts) / static_cast<double>(qpcFreq);
-			return sec;
-		}
-		static uint64_t qpcFreq;
-#endif
-		static uint64_t tscFreq;
-
-		void readNew(void);
-	};
-
 	struct funcProfileRecord
 	{
 		const int   fileLineNum;
@@ -235,6 +59,7 @@ namespace FCEU
 		timeStampRecord min;
 		timeStampRecord max;
 		timeStampRecord sum;
+		timeStampRecord last;
 		unsigned int numCalls;
 		unsigned int recursionCount;
 
@@ -253,12 +78,21 @@ namespace FCEU
 		funcProfileRecord *rec;
 		timeStampRecord start;
 
-		profileFuncScoped(const char *fileNameStringLiteral,
-				  const int   fileLineNumber,
-				  const char *funcNameStringLiteral,
-				  const char *commentStringLiteral);
+		profileFuncScoped( funcProfileRecord *recordIn );
 
 		~profileFuncScoped(void);
+	};
+
+	struct profileExecVector
+	{
+		profileExecVector(void);
+		~profileExecVector(void);
+
+		void update(void);
+
+		std::vector <funcProfileRecord> _vec;
+
+		FILE *logFp;
 	};
 
 	class profilerFuncMap
@@ -266,6 +100,12 @@ namespace FCEU
 		public:
 			profilerFuncMap();
 			~profilerFuncMap();
+
+			int addRecord(const char *fileNameStringLiteral,
+				      const int   fileLineNumber,
+				      const char *funcNameStringLiteral,
+				      const char *commentStringLiteral,
+				      funcProfileRecord *rec );
 
 			funcProfileRecord *findRecord(const char *fileNameStringLiteral,
 						      const int   fileLineNumber,
@@ -312,7 +152,12 @@ namespace FCEU
 #define  __FCEU_PROFILE_FUNC_NAME__  __func__
 #endif
 
-#define  FCEU_PROFILE_FUNC(id, comment)   FCEU::profileFuncScoped  id( __FILE__, __LINE__, __FCEU_PROFILE_FUNC_NAME__, comment )
+#define  FCEU_PROFILE_FUNC(id, comment)   \
+	static thread_local FCEU::funcProfileRecord  id( __FILE__, __LINE__, __FCEU_PROFILE_FUNC_NAME__, comment ); \
+	FCEU::profileFuncScoped id ## _unique_scope( &id )
+
+
+int FCEU_profiler_log_thread_activity(void);
 
 #else  // __FCEU_PROFILER_ENABLE__ not defined
 

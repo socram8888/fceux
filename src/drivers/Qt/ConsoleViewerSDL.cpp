@@ -89,7 +89,7 @@ ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 
 	if ( localBuf )
 	{
-		memset( localBuf, 0, localBufSize );
+		memset32( localBuf, alphaMask, localBufSize );
 	}
 
 	forceAspect  = true;
@@ -122,6 +122,8 @@ ConsoleViewSDL_t::ConsoleViewSDL_t(QWidget *parent)
 
 ConsoleViewSDL_t::~ConsoleViewSDL_t(void)
 {
+	//printf("Destroying SDL Viewport\n");
+
 	if ( localBuf )
 	{
 		free( localBuf ); localBuf = NULL;
@@ -240,7 +242,7 @@ void ConsoleViewSDL_t::transfer2LocalBuffer(void)
 	}
 	else
 	{
-		memcpy( localBuf, src, cpSize );
+		copyPixels32( dest, src, cpSize, alphaMask);
 	}
 }
 

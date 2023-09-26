@@ -53,6 +53,7 @@
 #include "../../cheat.h"
 #include "../../movie.h"
 #include "../../state.h"
+#include "../../profiler.h"
 #include "../../version.h"
 
 #ifdef _S9XLUA_H
@@ -61,6 +62,7 @@
 
 #include "common/os_utils.h"
 #include "common/configSys.h"
+#include "utils/timeStamp.h"
 #include "../../oldmovie.h"
 #include "../../types.h"
 
@@ -190,7 +192,23 @@ const char *FCEUD_GetCompilerString(void)
 uint64
 FCEUD_GetTime(void)
 {
-	return SDL_GetTicks();
+	uint64 t;
+
+	if (FCEU::timeStampModuleInitialized())
+	{
+		FCEU::timeStampRecord ts;
+
+		ts.readNew();
+
+		t = ts.toCounts();
+	}
+	else
+	{
+		t = (double)SDL_GetTicks();
+
+		t = t * 1e-3;
+	}
+	return t;
 }
 
 /**
@@ -200,7 +218,13 @@ uint64
 FCEUD_GetTimeFreq(void)
 {
 	// SDL_GetTicks() is in milliseconds
-	return 1000;
+	uint64 f = 1000;
+
+	if (FCEU::timeStampModuleInitialized())
+	{
+		f = FCEU::timeStampRecord::countFreq();
+	}
+	return f;
 }
 
 /**
@@ -1465,6 +1489,9 @@ int  fceuWrapperUpdate( void )
 
 		emulatorHasMutex = 0;
 
+#ifdef __FCEU_PROFILER_ENABLE__
+		FCEU_profiler_log_thread_activity();
+#endif
 		while ( SpeedThrottle() )
 		{
 			// Input device processing is in main thread
@@ -1478,6 +1505,9 @@ int  fceuWrapperUpdate( void )
 
 		emulatorHasMutex = 0;
 
+#ifdef __FCEU_PROFILER_ENABLE__
+		FCEU_profiler_log_thread_activity();
+#endif
 		msleep( 100 );
 	}
 	return 0;
