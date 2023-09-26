@@ -29,23 +29,17 @@ static void Sync(void) {
 	setchr8(0);
 	switch (mir_reg) {
 	case 0:
-		setmirror(MI_H);
+		setmirror(MI_V);
 		break;
 	case 1:
-		setmirror(MI_0);
-		break;
-	case 2:
-		setmirror(MI_1);
-		break;
-	case 3:
-		setmirror(MI_V);
+		setmirror(MI_H);
 		break;
 	}
 }
 
 static DECLFW(MirRegWrite) {
 	// 2 bit register for mirroring control, fed LSB first
-	mir_reg = ((V & 1) << 1) | (mir_reg >> 1);
+	mir_reg = V & 1;
 	Sync();
 }
 
